@@ -1,0 +1,155 @@
+# Kubernetes Hands-On Exercise Series
+
+Welcome to Exercise-1 Kubernetes (K8s) exercises! These activities will help you understand the basics of how Kubernetes runs and manages containerized applications.
+
+## Business Problem (Zepto Example)
+
+Imagine you are a DevOps Engineer at Zepto. The product team just built a lightweight web app that shows the storefront and delivery status page for customers.
+
+Your task as the DevOps engineer: Deploy this app on Kubernetes so that it is always running, portable, and can be scaled later. Simulate this using the popular `nginx` container image (think of it as Zepto's storefront web app).
+
+## Exercise 1: Hello Pod
+
+**Goal:** Run your first app inside Kubernetes and access it.
+
+### Pre-Requisites
+
+#### 1. Install Minikube (one-time setup)
+
+**On Linux:**
+
+```bash
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube
+```
+
+**On macOS (with Homebrew):**
+
+```bash
+brew install minikube
+```
+
+**On Windows (PowerShell, run as Administrator):**
+
+```powershell
+choco install minikube
+```
+
+**On WSL (Windows Linux):**
+
+Run these commands inside your WSL terminal:
+
+```bash
+# Update system
+sudo apt-get update -y
+sudo apt-get install -y curl apt-transport-https virtualbox virtualbox-ext-pack
+
+# Download Minikube
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+
+# Install Minikube binary
+sudo install minikube-linux-amd64 /usr/local/bin/minikube
+```
+
+> **Note:** You need Docker or a VM driver (VirtualBox, Hyper-V) installed.
+
+### Steps: Deploy Nginx Image as a Pod
+
+1. Start a local Kubernetes cluster with Minikube:
+
+```bash
+minikube start
+```
+
+2. Create your first Pod (using the Nginx image):
+
+```bash
+kubectl run hello-k8s --image=nginx --port=80
+```
+
+3. Verify the Pod is running:
+
+```bash
+kubectl get pods
+```
+
+4. Expose the Pod as a Service:
+
+```bash
+kubectl expose pod hello-k8s --type=NodePort --port=80
+```
+
+5. Open the app in your browser:
+
+```bash
+minikube service hello-k8s
+```
+
+You should see the Nginx welcome page. Congratulations, you just deployed your first container in Kubernetes!
+
+---
+
+## System Internal Details
+
+The diagram below walks through what actually happens behind the scenes when you run `kubectl run hello-k8s --image=nginx --port=80`.
+
+![Kubernetes Internal Architecture Flow](./images/k8s-exercise-1.jpg)
+
+### Step-by-Step Flow
+
+1. **kubectl → kube-apiserver**
+   The `kubectl` CLI connects to the `kube-apiserver` and sends a Pod manifest (in JSON) over REST API:
+   - Pod name: `hello-k8s`
+   - Container image: `nginx`
+   - Container port: `80`
+
+2. **kube-apiserver → etcd**
+   The `kube-apiserver` receives the request and stores the Pod manifest in `etcd`, the cluster's key-value store, recording: *"There should be a Pod called `hello-k8s` running an nginx container on port 80."*
+
+3. **kube-scheduler**
+   The `kube-scheduler` watches for new (unscheduled) Pod states in `etcd` and chooses a worker node that has enough CPU and memory to run the Pod.
+
+4. **kube-apiserver → kubelet**
+   The `kube-apiserver` notifies the `kubelet` (the agent running on the chosen worker node): *"You run this Pod on your system."*
+
+5. **kubelet → CRI-O**
+   The `kubelet` instructs the container runtime (`CRI-O`) to:
+   - Pull the Nginx image from Docker Hub (or another registry)
+   - Create a container from the image
+   - Set up the filesystem and mount volumes
+   - Run the process inside an isolated Linux namespace (PID, network, cgroup)
+
+6. **CRI-O → CNI**
+   The Container Network Interface (`CNI`) assigns a unique IP address to the Pod. This IP is reachable inside the cluster.
+
+7. **kubelet → kube-apiserver**
+   The `kubelet` updates the `kube-apiserver` with the Pod's status: *"Pod `hello-k8s` is running."*
+
+### Key Components
+
+| Component | Role |
+|---|---|
+| `kubectl` | CLI tool used to send commands to the cluster |
+| `kube-apiserver` | Front door of the control plane; validates and processes requests |
+| `etcd` | Distributed key-value store holding the cluster's desired state |
+| `kube-scheduler` | Decides which worker node a Pod should run on |
+| `kube-controller-manager` | Runs controllers that regulate cluster state |
+| `cloud-controller-manager` | Manages cloud-provider-specific control logic |
+| `kubelet` | Node agent that ensures containers are running as expected |
+| `CRI-O` | Container runtime that pulls images and runs containers |
+| `CNI` | Assigns networking (IP addresses) to Pods |
+| `kube-proxy` | Manages network rules for Pod-to-Pod and Service communication |
+
+---
+
+## Result
+
+Successfully deployed and accessed an Nginx application using Kubernetes and Minikube, and understood the internal request flow from `kubectl` to the running container.
+
+## Technologies Used
+
+- Kubernetes
+- Minikube
+- Docker
+- Nginx
+- kubectl
