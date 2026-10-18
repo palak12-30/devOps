@@ -1,6 +1,6 @@
 # Lab 3: Scaling a Flask App with a ReplicaSet
 
-[Back to assignment index](../README.md)
+[Back to all labs](../)
 
 Run the commands from the repository root unless a step specifies another directory.
 

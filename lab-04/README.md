@@ -1,6 +1,6 @@
 # Lab 4: Docker Networking with Flask, MySQL and Redis
 
-[Back to assignment index](../README.md)
+[Back to all labs](../)
 
 Run the commands from the repository root unless a step specifies another directory.
 

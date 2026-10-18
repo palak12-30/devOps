@@ -1,6 +1,6 @@
 # Lab 5: Docker Security with AppArmor and Python
 
-[Back to assignment index](../README.md)
+[Back to all labs](../)
 
 Run the commands from the repository root unless a step specifies another directory.
 

@@ -1,6 +1,6 @@
 # Lab 10: Multiple Applications on Three Kubernetes Nodes
 
-[Back to assignment index](../README.md)
+[Back to all labs](../)
 
 Run the commands from the repository root unless a step specifies another directory.
 
