@@ -1,0 +1,86 @@
+pipeline {
+    agent any
+    options {
+        skipDefaultCheckout(true)
+        disableConcurrentBuilds()
+        timeout(time: 10, unit: 'MINUTES')
+    }
+    parameters {
+        booleanParam(name: 'USE_LOCAL_SOURCE', defaultValue: true,
+            description: 'Use the mounted files before the final GitHub push. Uncheck for a Git SCM run.')
+    }
+    stages {
+        stage('Build') {
+            steps {
+                script {
+                    if (params.USE_LOCAL_SOURCE) {
+                        sh '''
+                            mkdir -p lab-09
+                            cp /opt/devops-labs/lab-09/app.py /opt/devops-labs/lab-09/requirements.txt /opt/devops-labs/lab-09/test_app.py /opt/devops-labs/lab-09/check_http.py lab-09/
+                        '''
+                    } else {
+                        checkout scm
+                    }
+                }
+                dir('lab-09') {
+                    sh '''
+                        python3 -m venv .venv
+                        .venv/bin/python -m pip install --disable-pip-version-check -r requirements.txt
+                    '''
+                }
+            }
+        }
+        stage('Test') {
+            steps {
+                dir('lab-09') {
+                    sh '.venv/bin/python -m unittest -v test_app'
+                }
+            }
+        }
+        stage('Deploy') {
+            steps {
+                dir('lab-09') {
+                    sh '''
+                        mkdir -p python-app-deploy
+                        cp app.py requirements.txt python-app-deploy/
+                        echo "Mock deployment copied to $PWD/python-app-deploy"
+                    '''
+                }
+            }
+        }
+        stage('Run Application') {
+            steps {
+                dir('lab-09') {
+                    sh '''
+                        nohup .venv/bin/python -u python-app-deploy/app.py > python-app-deploy/app.log 2>&1 < /dev/null &
+                        echo $! > python-app-deploy/app.pid
+                    '''
+                }
+            }
+        }
+        stage('Test Application') {
+            steps {
+                dir('lab-09') {
+                    sh '.venv/bin/python check_http.py'
+                }
+            }
+        }
+    }
+    post {
+        always {
+            sh '''
+                if [ -f lab-09/python-app-deploy/app.pid ]; then
+                    kill "$(cat lab-09/python-app-deploy/app.pid)" 2>/dev/null || true
+                    rm -f lab-09/python-app-deploy/app.pid
+                fi
+            '''
+            archiveArtifacts artifacts: 'lab-09/python-app-deploy/app.log', allowEmptyArchive: true
+        }
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed. Check the console and application log.'
+        }
+    }
+}

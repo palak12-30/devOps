@@ -1,0 +1,73 @@
+pipeline {
+    agent any
+    options {
+        skipDefaultCheckout(true)
+        disableConcurrentBuilds()
+        timeout(time: 20, unit: 'MINUTES')
+    }
+    parameters {
+        booleanParam(name: 'USE_LOCAL_SOURCE', defaultValue: true,
+            description: 'Use the mounted files before the final GitHub push. Uncheck for a Git SCM run.')
+        booleanParam(name: 'ALERT_DEMO', defaultValue: false,
+            description: 'Simulate pending deliveries of 50-100 and delivery times of 35-45 seconds.')
+    }
+    stages {
+        stage('Pre-check Docker') {
+            steps {
+                sh 'docker --version && docker info --format "Server={{.ServerVersion}}" && docker compose version'
+            }
+        }
+        stage('Setup Workspace') {
+            steps {
+                script {
+                    if (params.USE_LOCAL_SOURCE) {
+                        sh 'mkdir -p lab-06 && cp -R /opt/devops-labs/lab-06/. lab-06/'
+                    } else {
+                        checkout scm
+                    }
+                }
+            }
+        }
+        stage('Build Docker Images') {
+            steps {
+                sh 'docker compose -p devops-lab06 -f lab-06/compose.yaml build'
+                sh 'docker compose -p devops-lab06 -f lab-06/compose.yaml run --rm --no-deps --entrypoint /bin/promtool prometheus check config /etc/prometheus/prometheus.yml'
+            }
+        }
+        stage('Run Application') {
+            steps {
+                script {
+                    withEnv(["ALERT_DEMO=${params.ALERT_DEMO}"]) {
+                        sh 'docker compose -p devops-lab06 -f lab-06/compose.yaml up -d metrics'
+                    }
+                }
+            }
+        }
+        stage('Run Prometheus & Grafana') {
+            steps {
+                script {
+                    withEnv(["ALERT_DEMO=${params.ALERT_DEMO}"]) {
+                        sh 'docker compose -p devops-lab06 -f lab-06/compose.yaml up -d'
+                    }
+                }
+            }
+        }
+        stage('Verify Monitoring') {
+            steps {
+                script {
+                    def checkArgs = params.ALERT_DEMO ? '--expect-alerts' : ''
+                    sh "docker compose -p devops-lab06 -f lab-06/compose.yaml exec -T metrics python verify_stack.py ${checkArgs}"
+                }
+                sh 'docker compose -p devops-lab06 -f lab-06/compose.yaml ps'
+            }
+        }
+    }
+    post {
+        success {
+            echo 'Monitoring stack verified. Metrics: localhost:8001/metrics; Prometheus: localhost:9090; Grafana: localhost:3000'
+        }
+        failure {
+            sh 'docker compose -p devops-lab06 -f lab-06/compose.yaml logs --tail=40 || true'
+        }
+    }
+}
